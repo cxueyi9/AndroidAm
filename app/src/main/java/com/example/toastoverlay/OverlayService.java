@@ -11,6 +11,7 @@ import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.IBinder;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -42,9 +43,8 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
     private TextView textView;
 
     private SharedPreferences prefs;
-    private int width, height, color, transparency, textSizeSp;
+    private int width, height, color, transparency, textSizeSp, decodeMode;
     private float alpha;
-    private boolean fixChinese;
 
     private BroadcastReceiver textReceiver;
     private BroadcastReceiver updateReceiver;
@@ -70,14 +70,14 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         int defaultColor = Color.argb(255, 0, 0, 0);
         int defaultTransparency = 70;
         int defaultTextSize = 7;
-        boolean defaultFixChinese = false;
+        int defaultDecodeMode = 0; // 0=无, 1=GBK, 2=UTF-8, 3=Base64
 
         width = prefs.getInt("width", defaultWidth);
         height = prefs.getInt("height", defaultHeight);
         color = prefs.getInt("color", defaultColor);
         transparency = prefs.getInt("transparency", defaultTransparency);
         textSizeSp = prefs.getInt("text_size", defaultTextSize);
-        fixChinese = prefs.getBoolean("fix_chinese", defaultFixChinese);
+        decodeMode = prefs.getInt("decode_mode", defaultDecodeMode);
         alpha = transparency / 100f;
     }
 
@@ -89,7 +89,7 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
 
         overlayView.setBackgroundColor(color);
         overlayView.setAlpha(alpha);
-        textView.setTextSize(textSizeSp); // 应用字号
+        textView.setTextSize(textSizeSp);
 
         int type;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -169,19 +169,30 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
     }
 
     private void appendText(String rawText) {
-        String text = rawText;
-        // 如果启用了中文修复，尝试将 ISO-8859-1 字节转为 UTF-8
-        if (fixChinese) {
-            try {
-                byte[] bytes = rawText.getBytes(StandardCharsets.ISO_8859_1);
-                text = new String(bytes, StandardCharsets.UTF_8);
-            } catch (Exception e) {
-                // 转换失败则保留原样
+        String decodedText = rawText;
+        try {
+            switch (decodeMode) {
+                case 1: // GBK修复
+                    decodedText = new String(rawText.getBytes(StandardCharsets.ISO_8859_1), "GBK");
+                    break;
+                case 2: // UTF-8修复
+                    decodedText = new String(rawText.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
+                    break;
+                case 3: // Base64解码
+                    byte[] bytes = Base64.decode(rawText, Base64.DEFAULT);
+                    decodedText = new String(bytes, StandardCharsets.UTF_8);
+                    break;
+                case 0: // 无
+                default:
+                    decodedText = rawText;
+                    break;
             }
+        } catch (Exception e) {
+            decodedText = rawText; // 解码失败则使用原样
         }
 
         String timeStamp = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
-        String line = timeStamp + " " + text;
+        String line = timeStamp + " " + decodedText;
 
         if (textBuilder.length() > 0) {
             textBuilder.append("\n");
@@ -200,15 +211,11 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
 
     private void updateOverlay() {
         if (overlayView != null && windowManager != null) {
-            // 更新尺寸
             layoutParams.width = width;
             layoutParams.height = height;
-            // 更新背景和透明度
             overlayView.setBackgroundColor(color);
             overlayView.setAlpha(alpha);
-            // 更新字号
             textView.setTextSize(textSizeSp);
-            // 应用新布局
             windowManager.updateViewLayout(overlayView, layoutParams);
         }
     }
