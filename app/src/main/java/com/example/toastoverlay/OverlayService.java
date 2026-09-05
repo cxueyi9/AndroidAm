@@ -20,6 +20,7 @@ import android.widget.TextView;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -31,7 +32,7 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
     public static final String ACTION_SHOW_TEXT = "com.example.toastoverlay.SHOW_TEXT";
     public static final String ACTION_UPDATE_SETTINGS = "com.example.toastoverlay.UPDATE_SETTINGS";
     public static final String EXTRA_TEXT = "text";
-    public static final String EXTRA_TEXT_FLOAT = "text_float"; // 用于接收 --ef 传递的 float
+    public static final String EXTRA_TEXT_FLOAT = "text_float";
 
     public static boolean isRunning = false;
 
@@ -41,8 +42,9 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
     private TextView textView;
 
     private SharedPreferences prefs;
-    private int width, height, color, transparency;
+    private int width, height, color, transparency, textSizeSp;
     private float alpha;
+    private boolean fixChinese;
 
     private BroadcastReceiver textReceiver;
     private BroadcastReceiver updateReceiver;
@@ -67,11 +69,15 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         int defaultHeight = (int) (getResources().getDisplayMetrics().density * 200);
         int defaultColor = Color.argb(255, 0, 0, 0);
         int defaultTransparency = 70;
+        int defaultTextSize = 7;
+        boolean defaultFixChinese = false;
 
         width = prefs.getInt("width", defaultWidth);
         height = prefs.getInt("height", defaultHeight);
         color = prefs.getInt("color", defaultColor);
         transparency = prefs.getInt("transparency", defaultTransparency);
+        textSizeSp = prefs.getInt("text_size", defaultTextSize);
+        fixChinese = prefs.getBoolean("fix_chinese", defaultFixChinese);
         alpha = transparency / 100f;
     }
 
@@ -83,6 +89,7 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
 
         overlayView.setBackgroundColor(color);
         overlayView.setAlpha(alpha);
+        textView.setTextSize(textSizeSp); // 应用字号
 
         int type;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -134,11 +141,9 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
             public void onReceive(Context context, Intent intent) {
                 if (ACTION_SHOW_TEXT.equals(intent.getAction())) {
                     String text = null;
-                    // 优先尝试字符串
                     if (intent.hasExtra(EXTRA_TEXT)) {
                         text = intent.getStringExtra(EXTRA_TEXT);
                     } else if (intent.hasExtra(EXTRA_TEXT_FLOAT)) {
-                        // 如果传递的是浮点数（用于兼容 --ef）
                         float f = intent.getFloatExtra(EXTRA_TEXT_FLOAT, 0f);
                         text = String.valueOf(f);
                     }
@@ -163,9 +168,20 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         LocalBroadcastManager.getInstance(this).registerReceiver(updateReceiver, new IntentFilter(ACTION_UPDATE_SETTINGS));
     }
 
-    private void appendText(String newText) {
+    private void appendText(String rawText) {
+        String text = rawText;
+        // 如果启用了中文修复，尝试将 ISO-8859-1 字节转为 UTF-8
+        if (fixChinese) {
+            try {
+                byte[] bytes = rawText.getBytes(StandardCharsets.ISO_8859_1);
+                text = new String(bytes, StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                // 转换失败则保留原样
+            }
+        }
+
         String timeStamp = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
-        String line = timeStamp + " " + newText;
+        String line = timeStamp + " " + text;
 
         if (textBuilder.length() > 0) {
             textBuilder.append("\n");
@@ -184,10 +200,15 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
 
     private void updateOverlay() {
         if (overlayView != null && windowManager != null) {
+            // 更新尺寸
             layoutParams.width = width;
             layoutParams.height = height;
+            // 更新背景和透明度
             overlayView.setBackgroundColor(color);
             overlayView.setAlpha(alpha);
+            // 更新字号
+            textView.setTextSize(textSizeSp);
+            // 应用新布局
             windowManager.updateViewLayout(overlayView, layoutParams);
         }
     }
