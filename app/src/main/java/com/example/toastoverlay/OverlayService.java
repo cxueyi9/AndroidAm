@@ -72,7 +72,7 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         int defaultColor = Color.argb(255, 0, 0, 0);
         int defaultTransparency = 70;
         int defaultTextSize = 7;
-        int defaultDecodeMode = 0; // 0=无, 1=GBK, 2=UTF-8, 3=Base64, 4=Unicode转义解析
+        int defaultDecodeMode = 0; // 0=none, 1=GBK, 2=UTF-8, 3=Base64, 4=Unicode escape
 
         width = prefs.getInt("width", defaultWidth);
         height = prefs.getInt("height", defaultHeight);
@@ -174,20 +174,20 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         String decodedText = rawText;
         try {
             switch (decodeMode) {
-                case 1: // GBK修复
+                case 1: // GBK fix
                     decodedText = new String(rawText.getBytes(StandardCharsets.ISO_8859_1), "GBK");
                     break;
-                case 2: // UTF-8修复
+                case 2: // UTF-8 fix
                     decodedText = new String(rawText.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
                     break;
-                case 3: // Base64解码
+                case 3: // Base64 decode
                     byte[] bytes = Base64.decode(rawText, Base64.DEFAULT);
                     decodedText = new String(bytes, StandardCharsets.UTF_8);
                     break;
-                case 4: // Unicode转义解析（例如 \\u4e2d\\u6587 -> 中文）
+                case 4: // Unicode escape (e.g. backslash-u4e2d -> 中)
                     decodedText = unescapeUnicode(rawText);
                     break;
-                case 0: // 无
+                case 0: // none
                 default:
                     decodedText = rawText;
                     break;
@@ -214,9 +214,8 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         textView.setText(textBuilder.toString());
     }
 
-    // 辅助方法：将 Unicode 转义（如 \\u4e2d\\u6587）转换为实际字符
+    // Convert Unicode escape sequences like backslash-u4e2d to actual characters
     private String unescapeUnicode(String input) {
-        // 如果输入不包含反斜杠 u，则直接返回（注意注释中避免\u，改用\\u）
         if (!input.contains("\\u")) return input;
         try {
             Pattern pattern = Pattern.compile("\\\\u([0-9a-fA-F]{4})");
