@@ -116,4 +116,46 @@
             android:paddingStart="8dp" />
     </LinearLayout>
 
+    <!-- 新增：字号设置 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="2"
+        android:layout_marginTop="8dp">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="字号 (sp)" />
+        <EditText
+            android:id="@+id/et_text_size"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:inputType="number"
+            android:singleLine="true"
+            android:text="7" />
+    </LinearLayout>
+
+    <!-- 新增：中文乱码修复开关 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="2"
+        android:layout_marginTop="8dp">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="修复中文乱码 (实验性)" />
+        <CheckBox
+            android:id="@+id/cb_fix_chinese"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center" />
+    </LinearLayout>
+
 </LinearLayout>
