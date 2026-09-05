@@ -10,10 +10,11 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.SeekBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -24,7 +25,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_OVERLAY_PERMISSION = 1001;
 
     private EditText etWidth, etHeight, etColor, etTextSize;
-    private CheckBox cbFixChinese;
+    private Spinner spinnerDecode;
     private SeekBar sbTransparency;
     private TextView tvTransparencyValue;
     private Button btnToggleService;
@@ -43,10 +44,16 @@ public class MainActivity extends AppCompatActivity {
         etHeight = findViewById(R.id.et_height);
         etColor = findViewById(R.id.et_color);
         etTextSize = findViewById(R.id.et_text_size);
-        cbFixChinese = findViewById(R.id.cb_fix_chinese);
+        spinnerDecode = findViewById(R.id.spinner_decode);
         sbTransparency = findViewById(R.id.sb_transparency);
         tvTransparencyValue = findViewById(R.id.tv_transparency_value);
         btnToggleService = findViewById(R.id.btn_toggle_service);
+
+        // 填充下拉选项（从strings加载）
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+                R.array.decode_options, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerDecode.setAdapter(adapter);
 
         loadSettings();
 
@@ -61,7 +68,6 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
-        // 所有输入框失去焦点时保存
         View.OnFocusChangeListener saveListener = (v, hasFocus) -> {
             if (!hasFocus) saveSettings();
         };
@@ -69,7 +75,15 @@ public class MainActivity extends AppCompatActivity {
         etHeight.setOnFocusChangeListener(saveListener);
         etColor.setOnFocusChangeListener(saveListener);
         etTextSize.setOnFocusChangeListener(saveListener);
-        cbFixChinese.setOnCheckedChangeListener((buttonView, isChecked) -> saveSettings());
+        // Spinner 选择变化时保存
+        spinnerDecode.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                saveSettings();
+            }
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
 
         btnToggleService.setOnClickListener(v -> {
             if (hasOverlayPermission()) {
@@ -95,14 +109,14 @@ public class MainActivity extends AppCompatActivity {
         int defaultColor = Color.argb(255, 0, 0, 0);
         int defaultTransparency = 70;
         int defaultTextSize = 7;
-        boolean defaultFixChinese = false;
+        int defaultDecodeMode = 0; // 0=无, 1=GBK, 2=UTF-8, 3=Base64
 
         int width = prefs.getInt("width", defaultWidth);
         int height = prefs.getInt("height", defaultHeight);
         int color = prefs.getInt("color", defaultColor);
         int transparency = prefs.getInt("transparency", defaultTransparency);
         int textSize = prefs.getInt("text_size", defaultTextSize);
-        boolean fixChinese = prefs.getBoolean("fix_chinese", defaultFixChinese);
+        int decodeMode = prefs.getInt("decode_mode", defaultDecodeMode);
 
         etWidth.setText(String.valueOf(width));
         etHeight.setText(String.valueOf(height));
@@ -110,7 +124,7 @@ public class MainActivity extends AppCompatActivity {
         sbTransparency.setProgress(transparency);
         tvTransparencyValue.setText(transparency + "%");
         etTextSize.setText(String.valueOf(textSize));
-        cbFixChinese.setChecked(fixChinese);
+        spinnerDecode.setSelection(decodeMode);
     }
 
     private void saveSettings() {
@@ -143,7 +157,8 @@ public class MainActivity extends AppCompatActivity {
             editor.putInt("text_size", textSize);
         } catch (NumberFormatException ignored) {}
 
-        editor.putBoolean("fix_chinese", cbFixChinese.isChecked());
+        int decodeMode = spinnerDecode.getSelectedItemPosition();
+        editor.putInt("decode_mode", decodeMode);
 
         editor.apply();
 
@@ -202,6 +217,6 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         isServiceRunning = OverlayService.isRunning;
         updateButtonText();
-        loadSettings(); // 同步显示
+        loadSettings();
     }
 }
