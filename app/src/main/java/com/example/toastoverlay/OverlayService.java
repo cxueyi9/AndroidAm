@@ -169,45 +169,69 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
     }
 
     private void appendText(String rawText) {
-        String decodedText = rawText;
-        try {
-            switch (decodeMode) {
-                case 1: // GBK修复
-                    decodedText = new String(rawText.getBytes(StandardCharsets.ISO_8859_1), "GBK");
-                    break;
-                case 2: // UTF-8修复
-                    decodedText = new String(rawText.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
-                    break;
-                case 3: // Base64解码
-                    byte[] bytes = Base64.decode(rawText, Base64.DEFAULT);
-                    decodedText = new String(bytes, StandardCharsets.UTF_8);
-                    break;
-                case 0: // 无
-                default:
-                    decodedText = rawText;
-                    break;
-            }
-        } catch (Exception e) {
-            decodedText = rawText; // 解码失败则使用原样
+    String decodedText = rawText;
+    try {
+        switch (decodeMode) {
+            case 1: // GBK修复
+                decodedText = new String(rawText.getBytes(StandardCharsets.ISO_8859_1), "GBK");
+                break;
+            case 2: // UTF-8修复
+                decodedText = new String(rawText.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
+                break;
+            case 3: // Base64解码
+                byte[] bytes = Base64.decode(rawText, Base64.DEFAULT);
+                decodedText = new String(bytes, StandardCharsets.UTF_8);
+                break;
+            case 4: // Unicode转义解析（例如 \u4e2d\u6587 -> 中文）
+                decodedText = unescapeUnicode(rawText);
+                break;
+            case 0: // 无
+            default:
+                decodedText = rawText;
+                break;
         }
-
-        String timeStamp = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
-        String line = timeStamp + " " + decodedText;
-
-        if (textBuilder.length() > 0) {
-            textBuilder.append("\n");
-        }
-        textBuilder.append(line);
-
-        String[] lines = textBuilder.toString().split("\n");
-        int maxLines = 4;
-        if (lines.length > maxLines) {
-            List<String> lastLines = Arrays.asList(lines).subList(lines.length - maxLines, lines.length);
-            textBuilder = new StringBuilder(TextUtils.join("\n", lastLines));
-        }
-
-        textView.setText(textBuilder.toString());
+    } catch (Exception e) {
+        decodedText = rawText; // 解码失败则使用原样
     }
+
+    String timeStamp = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
+    String line = timeStamp + " " + decodedText;
+
+    if (textBuilder.length() > 0) {
+        textBuilder.append("\n");
+    }
+    textBuilder.append(line);
+
+    String[] lines = textBuilder.toString().split("\n");
+    int maxLines = 4;
+    if (lines.length > maxLines) {
+        List<String> lastLines = Arrays.asList(lines).subList(lines.length - maxLines, lines.length);
+        textBuilder = new StringBuilder(TextUtils.join("\n", lastLines));
+    }
+
+    textView.setText(textBuilder.toString());
+}
+
+// 辅助方法：将 Unicode 转义（如 \u4e2d\u6587）转换为实际字符
+private String unescapeUnicode(String input) {
+    // 如果输入不包含 \u，则直接返回
+    if (!input.contains("\\u")) return input;
+    try {
+        // 使用 Java 的 URLDecoder 或手工解析，这里使用简单正则
+        // 但更可靠的做法是使用 Apache Commons Lang 的 StringEscapeUtils，但我们不想引入额外库
+        // 所以手工处理：匹配 \uXXXX
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\\\u([0-9a-fA-F]{4})").matcher(input);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            int code = Integer.parseInt(m.group(1), 16);
+            m.appendReplacement(sb, new String(Character.toChars(code)));
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    } catch (Exception e) {
+        return input; // 失败则原样
+    }
+}
 
     private void updateOverlay() {
         if (overlayView != null && windowManager != null) {
