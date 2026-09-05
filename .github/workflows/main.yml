@@ -1,0 +1,35 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ main, master ]   # 当推送到 main 或 master 分支时触发
+  pull_request:
+    branches: [ main, master ]   # 当 PR 指向这些分支时也会触发
+  workflow_dispatch:             # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build APK (Debug)
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7   # 保留7天，可自行调整
