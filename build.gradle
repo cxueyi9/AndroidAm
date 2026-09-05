@@ -9,13 +9,5 @@ buildscript {
     }
 }
 
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
-}
+// 删除 allprojects 块（或将其留空）
+// 因为依赖仓库已在 settings.gradle 中统一管理
