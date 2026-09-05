@@ -1,7 +1,6 @@
 package com.example.toastoverlay;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -12,6 +11,7 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -23,7 +23,8 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_OVERLAY_PERMISSION = 1001;
 
-    private EditText etWidth, etHeight, etColor;
+    private EditText etWidth, etHeight, etColor, etTextSize;
+    private CheckBox cbFixChinese;
     private SeekBar sbTransparency;
     private TextView tvTransparencyValue;
     private Button btnToggleService;
@@ -41,6 +42,8 @@ public class MainActivity extends AppCompatActivity {
         etWidth = findViewById(R.id.et_width);
         etHeight = findViewById(R.id.et_height);
         etColor = findViewById(R.id.et_color);
+        etTextSize = findViewById(R.id.et_text_size);
+        cbFixChinese = findViewById(R.id.cb_fix_chinese);
         sbTransparency = findViewById(R.id.sb_transparency);
         tvTransparencyValue = findViewById(R.id.tv_transparency_value);
         btnToggleService = findViewById(R.id.btn_toggle_service);
@@ -51,24 +54,22 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 tvTransparencyValue.setText(progress + "%");
-                if (fromUser) {
-                    saveSettings();
-                }
+                if (fromUser) saveSettings();
             }
 
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {}
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
+        // 所有输入框失去焦点时保存
         View.OnFocusChangeListener saveListener = (v, hasFocus) -> {
             if (!hasFocus) saveSettings();
         };
         etWidth.setOnFocusChangeListener(saveListener);
         etHeight.setOnFocusChangeListener(saveListener);
         etColor.setOnFocusChangeListener(saveListener);
+        etTextSize.setOnFocusChangeListener(saveListener);
+        cbFixChinese.setOnCheckedChangeListener((buttonView, isChecked) -> saveSettings());
 
         btnToggleService.setOnClickListener(v -> {
             if (hasOverlayPermission()) {
@@ -78,7 +79,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 自动启动服务（如果权限已授予）
+        // 自动启动服务
         if (hasOverlayPermission()) {
             if (!OverlayService.isRunning) {
                 startService(new Intent(this, OverlayService.class));
@@ -93,17 +94,23 @@ public class MainActivity extends AppCompatActivity {
         int defaultHeight = (int) (getResources().getDisplayMetrics().density * 200);
         int defaultColor = Color.argb(255, 0, 0, 0);
         int defaultTransparency = 70;
+        int defaultTextSize = 7;
+        boolean defaultFixChinese = false;
 
         int width = prefs.getInt("width", defaultWidth);
         int height = prefs.getInt("height", defaultHeight);
         int color = prefs.getInt("color", defaultColor);
         int transparency = prefs.getInt("transparency", defaultTransparency);
+        int textSize = prefs.getInt("text_size", defaultTextSize);
+        boolean fixChinese = prefs.getBoolean("fix_chinese", defaultFixChinese);
 
         etWidth.setText(String.valueOf(width));
         etHeight.setText(String.valueOf(height));
         etColor.setText(String.format("#%08X", color));
         sbTransparency.setProgress(transparency);
         tvTransparencyValue.setText(transparency + "%");
+        etTextSize.setText(String.valueOf(textSize));
+        cbFixChinese.setChecked(fixChinese);
     }
 
     private void saveSettings() {
@@ -124,12 +131,20 @@ public class MainActivity extends AppCompatActivity {
                 int color = Color.parseColor(colorStr);
                 editor.putInt("color", color);
             } catch (IllegalArgumentException ignored) {
-                Toast.makeText(this, "颜色格式错误，使用 #RRGGBB 或 #AARRGGBB", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "颜色格式错误", Toast.LENGTH_SHORT).show();
             }
         }
 
         int transparency = sbTransparency.getProgress();
         editor.putInt("transparency", transparency);
+
+        try {
+            int textSize = Integer.parseInt(etTextSize.getText().toString());
+            editor.putInt("text_size", textSize);
+        } catch (NumberFormatException ignored) {}
+
+        editor.putBoolean("fix_chinese", cbFixChinese.isChecked());
+
         editor.apply();
 
         if (isServiceRunning) {
@@ -179,11 +194,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateButtonText() {
-        if (isServiceRunning) {
-            btnToggleService.setText("停止服务");
-        } else {
-            btnToggleService.setText("启动服务");
-        }
+        btnToggleService.setText(isServiceRunning ? "停止服务" : "启动服务");
     }
 
     @Override
@@ -191,5 +202,6 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         isServiceRunning = OverlayService.isRunning;
         updateButtonText();
+        loadSettings(); // 同步显示
     }
 }
