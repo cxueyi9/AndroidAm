@@ -45,10 +45,8 @@ public class MainActivity extends AppCompatActivity {
         tvTransparencyValue = findViewById(R.id.tv_transparency_value);
         btnToggleService = findViewById(R.id.btn_toggle_service);
 
-        // 加载保存的设置
         loadSettings();
 
-        // 透明度 SeekBar 监听
         sbTransparency.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -65,7 +63,6 @@ public class MainActivity extends AppCompatActivity {
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
-        // 其他输入框失去焦点时保存
         View.OnFocusChangeListener saveListener = (v, hasFocus) -> {
             if (!hasFocus) saveSettings();
         };
@@ -73,7 +70,6 @@ public class MainActivity extends AppCompatActivity {
         etHeight.setOnFocusChangeListener(saveListener);
         etColor.setOnFocusChangeListener(saveListener);
 
-        // 按钮点击：启动/停止服务
         btnToggleService.setOnClickListener(v -> {
             if (hasOverlayPermission()) {
                 toggleService();
@@ -82,16 +78,21 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 检查服务是否在运行
+        // 自动启动服务（如果权限已授予）
+        if (hasOverlayPermission()) {
+            if (!OverlayService.isRunning) {
+                startService(new Intent(this, OverlayService.class));
+            }
+        }
         isServiceRunning = OverlayService.isRunning;
         updateButtonText();
     }
 
     private void loadSettings() {
         int defaultWidth = getResources().getDisplayMetrics().widthPixels * 2 / 5;
-        int defaultHeight = (int) (getResources().getDisplayMetrics().density * 200); // 约4行文字高度
-        int defaultColor = Color.argb(255, 0, 0, 0); // 黑色背景
-        int defaultTransparency = 70; // 0-100
+        int defaultHeight = (int) (getResources().getDisplayMetrics().density * 200);
+        int defaultColor = Color.argb(255, 0, 0, 0);
+        int defaultTransparency = 70;
 
         int width = prefs.getInt("width", defaultWidth);
         int height = prefs.getInt("height", defaultHeight);
@@ -129,10 +130,8 @@ public class MainActivity extends AppCompatActivity {
 
         int transparency = sbTransparency.getProgress();
         editor.putInt("transparency", transparency);
-
         editor.apply();
 
-        // 如果服务在运行，通知它更新设置
         if (isServiceRunning) {
             Intent intent = new Intent(OverlayService.ACTION_UPDATE_SETTINGS);
             sendBroadcast(intent);
@@ -174,7 +173,6 @@ public class MainActivity extends AppCompatActivity {
         } else {
             startService(new Intent(this, OverlayService.class));
             isServiceRunning = true;
-            // 保存当前设置到服务（服务启动时会自己读取，但为了立即生效，发送更新广播）
             saveSettings();
         }
         updateButtonText();
@@ -191,9 +189,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // 重新检查服务状态（可能在设置页面被系统杀死）
         isServiceRunning = OverlayService.isRunning;
         updateButtonText();
-        loadSettings(); // 重新加载可能被外部修改？
     }
 }
