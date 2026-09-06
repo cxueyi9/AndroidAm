@@ -47,6 +47,7 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
     private SharedPreferences prefs;
     private int width, height, color, transparency, textSizeSp, decodeMode;
     private float alpha;
+    private int posX, posY; // 坐标变量
 
     private BroadcastReceiver textReceiver;
     private BroadcastReceiver updateReceiver;
@@ -73,6 +74,8 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         int defaultTransparency = 70;
         int defaultTextSize = 7;
         int defaultDecodeMode = 0;
+        int defaultPosX = 0;
+        int defaultPosY = 0;
 
         width = prefs.getInt("width", defaultWidth);
         height = prefs.getInt("height", defaultHeight);
@@ -80,6 +83,8 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         transparency = prefs.getInt("transparency", defaultTransparency);
         textSizeSp = prefs.getInt("text_size", defaultTextSize);
         decodeMode = prefs.getInt("decode_mode", defaultDecodeMode);
+        posX = prefs.getInt("posX", defaultPosX);
+        posY = prefs.getInt("posY", defaultPosY);
         alpha = transparency / 100f;
     }
 
@@ -109,8 +114,8 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
                 PixelFormat.TRANSLUCENT
         );
         layoutParams.gravity = Gravity.TOP | Gravity.START;
-        layoutParams.x = 0;
-        layoutParams.y = 0;
+        layoutParams.x = posX;   // 恢复保存的X坐标
+        layoutParams.y = posY;   // 恢复保存的Y坐标
 
         overlayView.setOnTouchListener(new View.OnTouchListener() {
             private int initialX, initialY;
@@ -130,12 +135,24 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
                         layoutParams.y = initialY + (int) (event.getRawY() - initialTouchY);
                         windowManager.updateViewLayout(overlayView, layoutParams);
                         return true;
+                    case MotionEvent.ACTION_UP:
+                        // 拖动结束后保存坐标
+                        savePosition(layoutParams.x, layoutParams.y);
+                        break;
                 }
                 return false;
             }
         });
 
         windowManager.addView(overlayView, layoutParams);
+    }
+
+    // 保存坐标到 SharedPreferences
+    private void savePosition(int x, int y) {
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putInt("posX", x);
+        editor.putInt("posY", y);
+        editor.apply();
     }
 
     private void registerReceivers() {
@@ -204,10 +221,7 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         }
         textBuilder.append(line);
 
-        // 不再限制行数，直接显示所有内容
         textView.setText(textBuilder.toString());
-
-        // 自动滚动到底部，显示最新内容
         scrollView.post(() -> scrollView.fullScroll(ScrollView.FOCUS_DOWN));
     }
 
@@ -235,6 +249,7 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
             overlayView.setBackgroundColor(color);
             overlayView.setAlpha(alpha);
             textView.setTextSize(textSizeSp);
+            // 注意：更新设置时不要重置坐标，只修改尺寸/颜色等
             windowManager.updateViewLayout(overlayView, layoutParams);
         }
     }
