@@ -3,18 +3,26 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="8dp"
-    android:background="#000000">
+    android:background="#000000"
+    android:padding="4dp">   <!-- 整体边距调小，上下左右均为4dp -->
 
-    <TextView
-        android:id="@+id/tv_overlay_text"
+    <ScrollView
+        android:id="@+id/scrollView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:maxLines="4"
-        android:ellipsize="end"
-        android:gravity="top|start"
-        android:padding="4dp" />
+        android:scrollbars="vertical"
+        android:fillViewport="true">
+
+        <TextView
+            android:id="@+id/tv_overlay_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="7sp"
+            android:lineSpacingExtra="4dp"   <!-- 行间距增加4dp -->
+            android:padding="2dp"             <!-- 内边距调小，让文字紧贴边缘 -->
+            android:gravity="top|start" />
+
+    </ScrollView>
 
 </LinearLayout>
