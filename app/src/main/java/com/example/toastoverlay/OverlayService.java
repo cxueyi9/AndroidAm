@@ -17,15 +17,14 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -42,6 +41,7 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
     private WindowManager windowManager;
     private WindowManager.LayoutParams layoutParams;
     private LinearLayout overlayView;
+    private ScrollView scrollView;
     private TextView textView;
 
     private SharedPreferences prefs;
@@ -72,7 +72,7 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         int defaultColor = Color.argb(255, 0, 0, 0);
         int defaultTransparency = 70;
         int defaultTextSize = 7;
-        int defaultDecodeMode = 0; // 0=none, 1=GBK, 2=UTF-8, 3=Base64, 4=Unicode escape
+        int defaultDecodeMode = 0;
 
         width = prefs.getInt("width", defaultWidth);
         height = prefs.getInt("height", defaultHeight);
@@ -87,6 +87,7 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
         overlayView = (LinearLayout) View.inflate(this, R.layout.overlay_layout, null);
+        scrollView = overlayView.findViewById(R.id.scrollView);
         textView = overlayView.findViewById(R.id.tv_overlay_text);
 
         overlayView.setBackgroundColor(color);
@@ -174,20 +175,19 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         String decodedText = rawText;
         try {
             switch (decodeMode) {
-                case 1: // GBK fix
+                case 1:
                     decodedText = new String(rawText.getBytes(StandardCharsets.ISO_8859_1), "GBK");
                     break;
-                case 2: // UTF-8 fix
+                case 2:
                     decodedText = new String(rawText.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
                     break;
-                case 3: // Base64 decode
+                case 3:
                     byte[] bytes = Base64.decode(rawText, Base64.DEFAULT);
                     decodedText = new String(bytes, StandardCharsets.UTF_8);
                     break;
-                case 4: // Unicode escape (e.g. backslash-u4e2d -> 中)
+                case 4:
                     decodedText = unescapeUnicode(rawText);
                     break;
-                case 0: // none
                 default:
                     decodedText = rawText;
                     break;
@@ -204,17 +204,13 @@ public class OverlayService extends Service implements SharedPreferences.OnShare
         }
         textBuilder.append(line);
 
-        String[] lines = textBuilder.toString().split("\n");
-        int maxLines = 4;
-        if (lines.length > maxLines) {
-            List<String> lastLines = Arrays.asList(lines).subList(lines.length - maxLines, lines.length);
-            textBuilder = new StringBuilder(TextUtils.join("\n", lastLines));
-        }
-
+        // 不再限制行数，直接显示所有内容
         textView.setText(textBuilder.toString());
+
+        // 自动滚动到底部，显示最新内容
+        scrollView.post(() -> scrollView.fullScroll(ScrollView.FOCUS_DOWN));
     }
 
-    // Convert Unicode escape sequences like backslash-u4e2d to actual characters
     private String unescapeUnicode(String input) {
         if (!input.contains("\\u")) return input;
         try {
